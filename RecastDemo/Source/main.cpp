@@ -43,6 +43,7 @@
 #include "Sample_TileMesh.h"
 #include "Sample_TempObstacles.h"
 #include "Sample_Debug.h"
+#include "Sample_Voxels.h"
 
 #ifdef WIN32
 #	define snprintf _snprintf
@@ -61,11 +62,15 @@ Sample* createSolo() { return new Sample_SoloMesh(); }
 Sample* createTile() { return new Sample_TileMesh(); }
 Sample* createTempObstacle() { return new Sample_TempObstacles(); }
 Sample* createDebug() { return new Sample_Debug(); }
+Sample* createVoxels() { return new Sample_Voxels(); }
+
 static SampleItem g_samples[] =
 {
 	{ createSolo, "Solo Mesh" },
 	{ createTile, "Tile Mesh" },
 	{ createTempObstacle, "Temp Obstacles" },
+    { createDebug, "Solo Debug" },
+    { createVoxels, "Solo Voxels" },
 };
 static const int g_nsamples = sizeof(g_samples) / sizeof(SampleItem);
 
