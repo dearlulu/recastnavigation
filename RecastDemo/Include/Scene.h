@@ -1,4 +1,5 @@
 #pragma once
+#include "Recast.h"
 
 struct Region;
 class Scene
@@ -6,9 +7,12 @@ class Scene
 public:
     ~Scene();
     bool Load(const char* filePath);
+    bool SetConfig(rcConfig* hf);
+    bool RasterizeScene(rcContext* ctx, rcHeightfield* hf, const int flagMergeThr);
  
 private:
     bool LoadRegion(Region* region, const char* filePath);
+    int GetSceneHeight();
     
 private:
     int m_regionWidth = 0;

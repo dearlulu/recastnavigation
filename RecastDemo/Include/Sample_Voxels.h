@@ -3,13 +3,17 @@
 #include "Sample.h"
 #include "DetourNavMesh.h"
 #include "Recast.h"
+#include "Scene.h"
 
 class Sample_Voxels : public Sample
 {
 protected:
+    Scene* m_scene = nullptr;
+    std::string m_voxelsName;
+    bool m_showScenes = false;
+    
 	bool m_keepInterResults = true;
 	float m_totalBuildTimeMs = 0;
-	unsigned char* m_triareas = nullptr;
 	rcHeightfield* m_solid = nullptr;
 	rcCompactHeightfield* m_chf = nullptr;
 	rcContourSet* m_cset = nullptr;
@@ -17,9 +21,6 @@ protected:
 	rcConfig m_cfg;	
 	rcPolyMeshDetail* m_dmesh = nullptr;
     
-    std::string m_voxelsName;
-    bool m_showLevels = false;
-	
 	enum DrawMode
 	{
 		DRAWMODE_NAVMESH,

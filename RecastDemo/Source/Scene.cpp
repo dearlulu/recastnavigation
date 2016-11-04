@@ -3,10 +3,13 @@
 #include <cstdio>
 #include <cstring>
 #include <cassert>
+#include <algorithm>
 
 #define MAX_SIZE (1 << 6)
 #define SCRIPT_COUNT_PER_REGION		16
 #define SCRIPT_DATA_SIZE (sizeof(uint32_t) * SCRIPT_COUNT_PER_REGION)
+#define CELL_LENGTH (1 << 5)
+#define COOR_ZOOM ((float)0.1)
 
 #pragma pack(1)
 struct CellBaseInfo
@@ -196,6 +199,155 @@ static bool AddObstacle(Region* pRegion, int nXCell, int nYCell, Cell* pCell)
     return true;
 }
 
+static bool LoadTerrainBufferV7(Region* pRegion, const uint8_t* pbyData, size_t uDataLen)
+{
+    bool            bResult                 = false;
+    bool            bRetCode                = false;
+    size_t          uLeftBytes              = uDataLen;
+    const uint8_t*  pbyOffset               = pbyData;
+    size_t          uBaseCellInfoSize       = sizeof(CellBaseInfo) + sizeof(uint16_t);
+    Cell*           pAllocNormalCell        = NULL;
+    Cell*           pAllocDynamicCell       = NULL;
+    int             nExtNormalCellCount     = 0;
+    size_t          uExtNormalCellDataSize  = sizeof(uint8_t) * 2 + sizeof(CellBaseInfo) + sizeof(uint16_t) * 2;
+    int             nExtDynamicCellCount    = 0;
+    size_t          uExtDynamicCellDataSize = sizeof(uint8_t) * 2 + sizeof(CellBaseInfo) + sizeof(uint16_t) * 2 + sizeof(uint16_t);
+    
+    assert(uLeftBytes >= uBaseCellInfoSize * MAX_SIZE * MAX_SIZE);
+    uLeftBytes -= uBaseCellInfoSize * MAX_SIZE * MAX_SIZE;
+    
+    for (int nCellY = 0; nCellY < MAX_SIZE; nCellY++)
+    {
+        for (int nCellX = 0; nCellX < MAX_SIZE; nCellX++)
+        {
+            Cell*              pCell       = GetLowestObstacle(pRegion, nCellX, nCellY);
+            CellBaseInfo*      pBaseInfo   = (CellBaseInfo*)pbyOffset;
+            
+            pCell->BaseInfo             = *pBaseInfo;
+            pCell->BaseInfo.dwDynamic   = 0;
+            pCell->LowLayer             = 0;
+            
+            pbyOffset += sizeof(CellBaseInfo);
+            
+            pCell->HighLayer = *(uint16_t*)pbyOffset;
+            pbyOffset += sizeof(uint16_t);
+        }
+    }
+    
+    assert(uLeftBytes >= sizeof(int32_t));
+    uLeftBytes -= sizeof(int32_t);
+    
+    nExtNormalCellCount = *(int32_t*)pbyOffset;
+    pbyOffset += sizeof(int32_t);
+    
+    assert(nExtNormalCellCount >= 0);
+    assert(uLeftBytes >= nExtNormalCellCount * uExtNormalCellDataSize);
+    uLeftBytes -= nExtNormalCellCount * uExtNormalCellDataSize;
+    
+    if (nExtNormalCellCount > 0)
+    {
+        assert(pRegion->NormalCellArray == nullptr);
+        pRegion->NormalCellArray = new Cell[nExtNormalCellCount];
+
+    }
+    
+    for (int nIndex = 0; nIndex < nExtNormalCellCount; nIndex++)
+    {
+        int                 nCellX      = 0;
+        int                 nCellY      = 0;
+        CellBaseInfo*       pBaseInfo   = NULL;
+        
+        pAllocNormalCell = pRegion->NormalCellArray + nIndex;
+        assert(pAllocNormalCell);
+        
+        nCellX = *(uint8_t*)pbyOffset;
+        pbyOffset += sizeof(uint8_t);
+        
+        nCellY = *(uint8_t*)pbyOffset;
+        pbyOffset += sizeof(uint8_t);
+        
+        pBaseInfo = (CellBaseInfo*)pbyOffset;
+        pbyOffset += sizeof(CellBaseInfo);
+        
+        pAllocNormalCell->BaseInfo = *pBaseInfo;
+        pAllocNormalCell->BaseInfo.dwDynamic = 0;
+        
+        pAllocNormalCell->HighLayer = *(uint16_t*)pbyOffset;
+        pbyOffset += sizeof(uint16_t);
+        
+        pAllocNormalCell->LowLayer = *(uint16_t*)pbyOffset;
+        pbyOffset += sizeof(uint16_t);
+        
+        bRetCode = AddObstacle(pRegion, nCellX, nCellY, pAllocNormalCell);
+        assert(bRetCode);
+        
+        pAllocNormalCell = NULL;
+    }
+    
+    assert(uLeftBytes >= sizeof(int32_t));
+    uLeftBytes -= sizeof(int32_t);
+    
+    nExtDynamicCellCount = *(int32_t*)pbyOffset;
+    pbyOffset += sizeof(int32_t);
+    
+    assert(nExtDynamicCellCount >= 0);
+    assert(uLeftBytes >= nExtDynamicCellCount * uExtDynamicCellDataSize);
+    uLeftBytes -= nExtDynamicCellCount * uExtDynamicCellDataSize;
+    
+    if (nExtDynamicCellCount > 0)
+    {
+        assert(pRegion->DynamicCellArray == nullptr);
+        pRegion->DynamicCellArray = new Cell[nExtDynamicCellCount];
+    }
+    
+    for (int nIndex = 0; nIndex < nExtDynamicCellCount; nIndex++)
+    {
+        int                 nCellX      = 0;
+        int                 nCellY      = 0;
+        CellBaseInfo*       pBaseInfo   = NULL;
+        
+        pAllocDynamicCell = pRegion->DynamicCellArray + nIndex;
+        assert(pAllocDynamicCell);
+        
+        nCellX = *(uint8_t*)pbyOffset;
+        pbyOffset += sizeof(uint8_t);
+        
+        nCellY = *(uint8_t*)pbyOffset;
+        pbyOffset += sizeof(uint8_t);
+        
+        pBaseInfo = (CellBaseInfo*)pbyOffset;
+        pbyOffset += sizeof(CellBaseInfo);
+        
+        pAllocDynamicCell->BaseInfo = *pBaseInfo;
+        pAllocDynamicCell->BaseInfo.dwDynamic = 1;
+        
+        pAllocDynamicCell->HighLayer = *(uint16_t*)pbyOffset;
+        pbyOffset += sizeof(uint16_t);
+        
+        pAllocDynamicCell->LowLayer = *(uint16_t*)pbyOffset;
+        pbyOffset += sizeof(uint16_t);
+        
+        pbyOffset += sizeof(uint16_t);
+        
+        bRetCode = AddObstacle(pRegion, nCellX, nCellY, pAllocDynamicCell);
+        assert(bRetCode);
+        
+        pAllocDynamicCell = NULL;
+    }
+    
+    
+    if (uLeftBytes >= SCRIPT_DATA_SIZE)
+    {
+        pbyOffset  += SCRIPT_DATA_SIZE;
+        uLeftBytes -= SCRIPT_DATA_SIZE;
+    }
+    
+    assert(uLeftBytes == 0);
+    
+    bResult = true;
+    return bResult;
+}
+
 static bool LoadTerrainBufferV8(Region* pRegion, const uint8_t* pbyData, size_t uDataLen)
 {
     bool            bResult                 = false;
@@ -350,16 +502,113 @@ bool Scene::LoadRegion(Region* region, const char* fileFolder)
     snprintf(filePath, sizeof(filePath), "%s.data/v_%03d/%03d_Region.map", fileFolder, region->RegionY, region->RegionX);
     
     auto file = fopen(filePath, "rb");
+    if (!file)
+        return false;
+    
     auto fileSize = GetFileSize(file);
-    
     auto buffer = new uint8_t[fileSize];
-    fread(buffer, fileSize, 1, file);
-    
+    auto retCode = fread(buffer, fileSize, 1, file);
+    assert(retCode == 1);
+
     auto header = (RegionHeader*)buffer;
     assert(header->RegionX == region->RegionX);
     assert(header->RegionY == region->RegionY);
-    assert(header->Version == 8);
     
-    LoadTerrainBufferV8(region, buffer + sizeof(RegionHeader), fileSize - sizeof(RegionHeader));
+    switch (header->Version)
+    {
+        case 7:
+            retCode = LoadTerrainBufferV7(region, buffer + sizeof(RegionHeader), fileSize - sizeof(RegionHeader));
+            assert(retCode);
+            break;
+            
+        case 8:
+            retCode = LoadTerrainBufferV8(region, buffer + sizeof(RegionHeader), fileSize - sizeof(RegionHeader));
+            assert(retCode);
+            break;
+            
+        default:
+            assert(false);
+            break;
+    }
+    
+    delete[] buffer;
+    fclose(file);
+    return retCode;
+}
+
+int Scene::GetSceneHeight()
+{
+    auto height = 0;
+    for (auto y = 0; y < m_regionHeight; y++)
+    {
+        for (auto x = 0; x < m_regionWidth; x++)
+        {
+            Region* region = &m_regions[y * m_regionWidth + x];
+            for (auto i = 0; i < (MAX_SIZE * MAX_SIZE); ++i)
+            {
+                auto cell = region->Cells + i;
+                while (cell)
+                {
+                    height = std::max(height, cell->HighLayer);
+                    cell = cell->Next;
+                }
+            }
+        }
+    }
+    
+    return height;
+}
+
+bool Scene::SetConfig(rcConfig* cfg)
+{
+    float bmin[] = {0, 0, 0};
+    float bmax[] = {
+        COOR_ZOOM * CELL_LENGTH * MAX_SIZE * m_regionWidth,
+        COOR_ZOOM * GetSceneHeight(),
+        COOR_ZOOM * CELL_LENGTH * MAX_SIZE * m_regionHeight};
+    float cs = COOR_ZOOM * CELL_LENGTH;
+    float ch = COOR_ZOOM * 1;
+    
+    cfg->cs = cs;
+    cfg->ch = ch;
+    rcVcopy(cfg->bmin, bmin);
+    rcVcopy(cfg->bmax, bmax);
+    rcCalcGridSize(bmin, bmax, cs, &cfg->width, &cfg->height);
+    return true;
+}
+
+bool Scene::RasterizeScene(rcContext* ctx, rcHeightfield* hf, const int flagMergeThr)
+{
+    
+    for (auto yRegion = 0; yRegion < m_regionHeight; yRegion++)
+    {
+        for (auto xRegion = 0; xRegion < m_regionWidth; xRegion++)
+        {
+            auto region = &m_regions[yRegion * m_regionWidth + xRegion];
+            for (auto yCell = 0; yCell < MAX_SIZE; yCell++)
+            {
+                for (auto xCell = 0; xCell < MAX_SIZE; xCell++)
+                {
+                    auto cell = GetLowestObstacle(region, xCell, yCell);
+                    cell = cell->Next;
+                    
+                    while (cell)
+                    {
+                        //if (cell->BaseInfo.dwCellType == 0)
+                        {
+                            // unsigned char area = cell->BaseInfo.dwCellType;
+                            unsigned char area = RC_WALKABLE_AREA;
+                            rcAddSpan(ctx, *hf, xRegion * MAX_SIZE + xCell,  yRegion * MAX_SIZE + yCell,
+                                      COOR_ZOOM * cell->LowLayer, COOR_ZOOM * cell->HighLayer, area, flagMergeThr);
+                        }
+
+                        
+                        cell = cell->Next;
+                    }
+                }
+            }
+        }
+    }
+    
     return true;
 }

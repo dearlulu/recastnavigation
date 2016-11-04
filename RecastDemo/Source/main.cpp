@@ -146,7 +146,7 @@ int main(int /*argc*/, char** /*argv*/)
 	
 	float cameraEulers[] = {45, -45};
 	float cameraPos[] = {0, 0, 0};
-	float camr = 1000;
+	float camr = 10000000;
 	float origCameraEulers[] = {0, 0}; // Used to compute rotational changes across frames.
 	
 	float moveW = 0, moveS = 0, moveA = 0, moveD = 0;
