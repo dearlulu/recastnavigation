@@ -425,6 +425,7 @@ bool Sample_Voxels::handleBuild()
     // Once all geoemtry is rasterized, we do initial pass of filtering to
     // remove unwanted overhangs caused by the conservative rasterization
     // as well as filter spans where the character cannot possibly stand.
+
     rcFilterLowHangingWalkableObstacles(m_ctx, m_cfg.walkableClimb, *m_solid);
     rcFilterLedgeSpans(m_ctx, m_cfg.walkableHeight, m_cfg.walkableClimb, *m_solid);
     rcFilterWalkableLowHeightSpans(m_ctx, m_cfg.walkableHeight, *m_solid);

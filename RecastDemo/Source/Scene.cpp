@@ -5,11 +5,12 @@
 #include <cassert>
 #include <algorithm>
 
+#define USE_TEST_SCENE
 #define MAX_SIZE (1 << 6)
 #define SCRIPT_COUNT_PER_REGION		16
 #define SCRIPT_DATA_SIZE (sizeof(uint32_t) * SCRIPT_COUNT_PER_REGION)
 #define CELL_LENGTH (1 << 5)
-#define COOR_ZOOM ((float)0.1)
+#define COOR_ZOOM ((float)1 / (1 << 6))
 
 #pragma pack(1)
 struct CellBaseInfo
@@ -61,8 +62,6 @@ struct Region
     Cell* DynamicCellArray = nullptr;
 };
 
-
-
 static long GetFileSize(FILE* file)
 {
     auto offset = ftell(file);
@@ -104,57 +103,6 @@ static void ParseVoxelCfg(const char* filePath, int& x, int& y)
     fclose(file);
 }
 
-Scene::~Scene()
-{
-    for (int y = 0; y < m_regionHeight; y++)
-    {
-        for (int x = 0; x < m_regionWidth; x++)
-        {
-            Region* region = &m_regions[y * m_regionWidth + x];
-            
-            if (region->Cells)
-                delete[] region->Cells;
-            
-            if (region->NormalCellArray)
-                delete[] region->NormalCellArray;
-            
-            
-            if (region->DynamicCellArray)
-                delete[] region->DynamicCellArray;
-        }
-    }
-    
-    if (m_regions)
-        delete[] m_regions;
-}
-
-bool Scene::Load(const char* filePath)
-{
-    ParseVoxelCfg(filePath, m_regionWidth, m_regionHeight);
-    
-    assert(m_regionWidth > 0 && m_regionWidth <= MAX_SIZE);
-    assert(m_regionHeight > 0 && m_regionHeight <= MAX_SIZE);
-
-    m_regions = new Region[m_regionWidth * m_regionHeight];
-    
-    for (int y = 0; y < m_regionHeight; y++)
-    {
-        for (int x = 0; x < m_regionWidth; x++)
-        {
-            Region* region = &m_regions[y * m_regionWidth + x];
-            
-            assert(region->Cells == nullptr);
-            
-            region->RegionX = x;
-            region->RegionY = y;
-            region->Cells = new Cell[MAX_SIZE * MAX_SIZE];
-            LoadRegion(region, filePath);
-        }
-    }
-    
-    return true;
-}
-
 static Cell* GetLowestObstacle(Region* pRegion, int nXCell, int nYCell)
 {
     assert(nXCell >= 0);
@@ -188,7 +136,7 @@ static bool AddObstacle(Region* pRegion, int nXCell, int nYCell, Cell* pCell)
             }
         }
         else
-        {			
+        {
             bFound = true;
         }
     }
@@ -248,7 +196,7 @@ static bool LoadTerrainBufferV7(Region* pRegion, const uint8_t* pbyData, size_t 
     {
         assert(pRegion->NormalCellArray == nullptr);
         pRegion->NormalCellArray = new Cell[nExtNormalCellCount];
-
+        
     }
     
     for (int nIndex = 0; nIndex < nExtNormalCellCount; nIndex++)
@@ -496,6 +444,114 @@ static bool LoadTerrainBufferV8(Region* pRegion, const uint8_t* pbyData, size_t 
     return bResult;
 }
 
+Scene::~Scene()
+{
+    for (int y = 0; y < m_regionHeight; y++)
+    {
+        for (int x = 0; x < m_regionWidth; x++)
+        {
+            Region* region = &m_regions[y * m_regionWidth + x];
+            
+            if (region->Cells)
+                delete[] region->Cells;
+            
+            if (region->NormalCellArray)
+                delete[] region->NormalCellArray;
+            
+            
+            if (region->DynamicCellArray)
+                delete[] region->DynamicCellArray;
+        }
+    }
+    
+    if (m_regions)
+        delete[] m_regions;
+}
+
+#ifdef USE_TEST_SCENE
+
+bool Scene::Load(const char* filePath)
+{
+    m_regionWidth = 2;
+    m_regionHeight = 2;
+    m_regions = new Region[m_regionWidth * m_regionHeight];
+
+    for (auto yRegion = 0; yRegion < m_regionHeight; yRegion++)
+    {
+        for (auto xRegion = 0; xRegion < m_regionWidth; xRegion++)
+        {
+            auto region = &m_regions[yRegion * m_regionWidth + xRegion];
+            assert(region->Cells == nullptr);
+            
+            region->RegionX = xRegion;
+            region->RegionY = yRegion;
+            region->Cells = new Cell[MAX_SIZE * MAX_SIZE];
+            
+            for (auto yCell = 0; yCell < MAX_SIZE; yCell++)
+            {
+                for (auto xCell = 0; xCell < MAX_SIZE; xCell++)
+                {
+                    auto cell = GetLowestObstacle(region, xCell, yCell);
+                    cell->HighLayer = 100 - yCell;
+                    cell->LowLayer = 10;
+                }
+            }
+        }
+    }
+    
+    for (auto yRegion = 0; yRegion < 1; yRegion++)
+    {
+        for (auto xRegion = 0; xRegion < 1; xRegion++)
+        {
+            auto region = &m_regions[yRegion * m_regionWidth + xRegion];
+            region->NormalCellArray = new Cell[MAX_SIZE * MAX_SIZE];
+    
+            for (auto yCell = 0; yCell < MAX_SIZE; yCell++)
+            {
+                for (auto xCell = 0; xCell < MAX_SIZE; xCell++)
+                {
+                    auto cell = &region->NormalCellArray[yCell * MAX_SIZE + xCell];
+                    cell->HighLayer = 1200 - yCell;
+                    cell->LowLayer = 1000;
+                    
+                    AddObstacle(region, xCell, yCell, cell);
+                    
+                }
+            }
+        }
+    }
+    
+    return true;
+}
+#else
+bool Scene::Load(const char* filePath)
+{
+    ParseVoxelCfg(filePath, m_regionWidth, m_regionHeight);
+    
+    assert(m_regionWidth > 0 && m_regionWidth <= MAX_SIZE);
+    assert(m_regionHeight > 0 && m_regionHeight <= MAX_SIZE);
+
+    m_regions = new Region[m_regionWidth * m_regionHeight];
+    
+    for (int y = 0; y < m_regionHeight; y++)
+    {
+        for (int x = 0; x < m_regionWidth; x++)
+        {
+            Region* region = &m_regions[y * m_regionWidth + x];
+            
+            assert(region->Cells == nullptr);
+            
+            region->RegionX = x;
+            region->RegionY = y;
+            region->Cells = new Cell[MAX_SIZE * MAX_SIZE];
+            LoadRegion(region, filePath);
+        }
+    }
+    
+    return true;
+}
+#endif
+
 bool Scene::LoadRegion(Region* region, const char* fileFolder)
 {
     char filePath[1024];
@@ -590,7 +646,7 @@ bool Scene::RasterizeScene(rcContext* ctx, rcHeightfield* hf, const int flagMerg
                 for (auto xCell = 0; xCell < MAX_SIZE; xCell++)
                 {
                     auto cell = GetLowestObstacle(region, xCell, yCell);
-                    cell = cell->Next;
+                    // cell = cell->Next;
                     
                     while (cell)
                     {
@@ -599,7 +655,7 @@ bool Scene::RasterizeScene(rcContext* ctx, rcHeightfield* hf, const int flagMerg
                             // unsigned char area = cell->BaseInfo.dwCellType;
                             unsigned char area = RC_WALKABLE_AREA;
                             rcAddSpan(ctx, *hf, xRegion * MAX_SIZE + xCell,  yRegion * MAX_SIZE + yCell,
-                                      COOR_ZOOM * cell->LowLayer, COOR_ZOOM * cell->HighLayer, area, flagMergeThr);
+                                      cell->LowLayer, cell->HighLayer, area, flagMergeThr);
                         }
 
                         
