@@ -146,7 +146,7 @@ int main(int /*argc*/, char** /*argv*/)
 	
 	float cameraEulers[] = {45, -45};
 	float cameraPos[] = {0, 0, 0};
-	float camr = 10000000;
+	float camr = 1000;
 	float origCameraEulers[] = {0, 0}; // Used to compute rotational changes across frames.
 	
 	float moveW = 0, moveS = 0, moveA = 0, moveD = 0;
@@ -435,7 +435,7 @@ int main(int /*argc*/, char** /*argv*/)
 		// Compute the projection matrix.
 		glMatrixMode(GL_PROJECTION);
 		glLoadIdentity();
-		gluPerspective(50.0f, (float)width/(float)height, 1.0f, camr);
+		gluPerspective(50.0f, (float)width/(float)height, 1.0f, camr * 1000);
 		GLdouble projectionMatrix[16];
 		glGetDoublev(GL_PROJECTION_MATRIX, projectionMatrix);
 		

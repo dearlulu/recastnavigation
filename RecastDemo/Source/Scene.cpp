@@ -5,7 +5,7 @@
 #include <cassert>
 #include <algorithm>
 
-#define USE_TEST_SCENE
+// #define USE_TEST_SCENE
 #define MAX_SIZE (1 << 6)
 #define SCRIPT_COUNT_PER_REGION		16
 #define SCRIPT_DATA_SIZE (sizeof(uint32_t) * SCRIPT_COUNT_PER_REGION)
